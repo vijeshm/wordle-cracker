@@ -1,3 +1,13 @@
+// The idea algorithm is as follows:
+// Among the list of five letter words, take a random guess and input that value.
+// Wait for a couple of seconds for the animation to complete and figure out what characters are absent, present and in their correct positions.
+// Filter the next set of words based on this information.
+// Each word in the filtered set should not contain characters which were marked absent.
+// It should definitely contain those characters which were marked present.
+// Additionally, it should also match all the characters which were already marked to be in their correct positions.
+// In each iteration, this list keeps reducing and it will converge to the solution.
+
+// Copied from the prod code of the website. There's a character list called Ta
 let fiveLetterWordsTa = [
   "aahed",
   "aalii",
@@ -10657,6 +10667,7 @@ let fiveLetterWordsTa = [
   "zymes",
   "zymic",
 ];
+// Copied from the prod code of the website. There's a character list called La
 let fiveLetterWordsLa = [
   "cigar",
   "rebut",
@@ -12976,11 +12987,14 @@ let fiveLetterWordsLa = [
 ];
 // let fiveLetterWords = [...fiveLetterWordsLa, ...fiveLetterWordsTa];
 let fiveLetterWords = [...fiveLetterWordsLa];
-let seedWord =
-  fiveLetterWords[Math.floor(Math.random() * fiveLetterWords.length)];
+
+// array form of the target word. Each index represents a character.
 let targetWord = [null, null, null, null, null];
 let trialNumber = 0;
-let guessWord = seedWord;
+let guessWord =
+  fiveLetterWords[Math.floor(Math.random() * fiveLetterWords.length)]; // randomly pick a word to begin with
+
+// filteredWords keeps changing and converging over every iteration
 let filteredWords = fiveLetterWords;
 let blackListedLetters = {};
 let whiteListedLetters = {};
@@ -12999,28 +13013,34 @@ function enterWord(word) {
   if (trialNumber < 6) {
     console.log("trialNumber is less than 6. Setting timeout");
     setTimeout(() => {
-      const currentGameRow = document
+      const tiles = document
         .getElementsByTagName("game-app")[0]
-        .$board.getElementsByTagName("game-row")[trialNumber];
-      const tiles = currentGameRow.$row.getElementsByTagName("game-tile");
+        .$board.getElementsByTagName("game-row")
+        [trialNumber].$row.getElementsByTagName("game-tile");
       for (let tileIndex = 0; tileIndex < tiles.length; tileIndex++) {
         let tile = tiles[tileIndex];
         const letter = tile.getAttribute("letter");
         const evaluationAttribute = tile.getAttribute("evaluation");
         switch (evaluationAttribute) {
+          // the only different "present" and "correct" is that, in case of "correct", we're updating the targetWord array as well.
+          // Since filtered words shouldn't contain blacklisted letters at all, we should be careful while blacklisting.
+          // Note that letters can repeat. If present/correct appears second, it should definitely be removed from blacklist. Because we know it appeared/is present.
+          // If absent appears second, we shouldn't mark it as blacklisted. Because we know it had appeared earlier, and we want to include it in the filter.
+          // That's why we have to carefully update when we encounter "absent".
           case "present":
             whiteListedLetters[letter] = true;
-            break;
-          case "absent":
-            // if it's already present, the app doesn't highlight the second occurence
-            if (!whiteListedLetters[letter]) {
-              // it hasn't occured even once
-              blackListedLetters[letter] = true;
-            }
+            delete blackListedLetters[letter];
             break;
           case "correct":
             targetWord[tileIndex] = letter;
+
             whiteListedLetters[letter] = true;
+            delete blackListedLetters[letter];
+            break;
+          case "absent":
+            if (!whiteListedLetters[letter]) {
+              blackListedLetters[letter] = true;
+            }
             break;
         }
       }
@@ -13028,6 +13048,9 @@ function enterWord(word) {
       console.log("filtering words. Current length:", filteredWords.length);
       console.log("blacklisted characters", blackListedLetters);
       console.log("whitelisted characters", whiteListedLetters);
+      console.log("targetWord", targetWord);
+
+      // filter the current candidates further, based on blacklisted letters, whitelisted letters and fixed positions in targetWord.
       filteredWords = filteredWords.filter((filteredWord) => {
         let isWordValid = true;
 
@@ -13047,8 +13070,8 @@ function enterWord(word) {
           });
         }
 
+        // filtered word's letters should match all the fixed letters of target word.
         if (isWordValid) {
-          // filteredWord doesn't contain blacklisted letters. Now check for positions.
           for (
             let letterIndex = 0;
             letterIndex < filteredWord.length;
